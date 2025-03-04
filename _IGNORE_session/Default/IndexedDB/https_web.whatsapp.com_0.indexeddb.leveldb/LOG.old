@@ -1,0 +1,13 @@
+2025/02/25-19:34:59.155 32ac Reusing MANIFEST C:\Users\Lenovo LOQ\OneDrive\ドキュメント\BotV3\_IGNORE_session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/02/25-19:34:59.158 32ac Recovering log #226
+2025/02/25-19:34:59.167 32ac Reusing old log C:\Users\Lenovo LOQ\OneDrive\ドキュメント\BotV3\_IGNORE_session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000226.log 
+2025/02/25-19:35:00.337 46b0 Level-0 table #231: started
+2025/02/25-19:35:00.369 46b0 Level-0 table #231: 176070 bytes OK
+2025/02/25-19:35:00.371 46b0 Delete type=0 #226
+2025/02/25-19:35:00.372 46b0 Manual compaction at level-0 from '\x00J\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00K\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/02/25-19:35:01.730 360c Compacting 1@1 + 1@2 files
+2025/02/25-19:35:01.829 360c Generated table #232@1: 40960 keys, 1864585 bytes
+2025/02/25-19:35:01.829 360c Compacted 1@1 + 1@2 files => 1864585 bytes
+2025/02/25-19:35:01.831 360c compacted to: files[ 0 0 1 0 0 0 0 ]
+2025/02/25-19:35:01.832 360c Delete type=2 #228
+2025/02/25-19:35:01.832 360c Delete type=2 #231
