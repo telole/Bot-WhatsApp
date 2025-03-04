@@ -4,7 +4,7 @@
 Bot WhatsApp ini dibuat menggunakan library [`@open-wa/wa-automate`](https://github.com/open-wa/wa-automate-nodejs). Bot ini memiliki berbagai fitur seperti:
 - Membalas pesan otomatis
 - Membuat stiker dari gambar dan GIF
-- Mengunduh video TikTok tanpa watermark
+- Mengunduh video TikTok tanpa watermark(error)
 - Menampilkan jadwal pelajaran
 
 ## 🚀 Instalasi
