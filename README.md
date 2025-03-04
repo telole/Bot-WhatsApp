@@ -73,5 +73,5 @@ Proyek ini menggunakan lisensi MIT. Bebas digunakan dan dikembangkan lebih lanju
 Jika ingin menambahkan fitur atau memperbaiki bug, silakan buat pull request atau diskusi di issues!
 
 ---
-📌 **Dibuat oleh:** [Nama Anda]
+📌 **Dibuat oleh:** [Naraya]
 
