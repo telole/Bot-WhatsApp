@@ -15,7 +15,6 @@ class WhatsAppBot {
         this.utilityService = new UtilityService();
         this.groupService = new GroupService();
         
-        // Commands yang bisa digunakan tanpa mention di grup
         this.groupCommands = [
             "!tiktok", "!yt", "!youtube", "!ig", "!instagram",
             "!stiker", "!quote", "!joke", "!cuaca", "!weather",
@@ -27,13 +26,12 @@ class WhatsAppBot {
         try {
             console.log("🔄 Memulai inisialisasi bot dengan konfigurasi minimal...");
 
-            // Konfigurasi MINIMAL sesuai rekomendasi @open-wa
             this.client = await create({
                 sessionId: "whatsapp-bot",
                 useChrome: true,
-                headless: false,          // Biar kelihatan kalau ada error di browser
-                qrTimeout: 0,             // Tidak timeout saat scan QR
-                authTimeout: 0,           // Jangan batasi proses login
+                headless: false,        
+                qrTimeout: 0,            
+                authTimeout: 0,          
                 blockCrashLogs: true,
                 disableSpins: true,
                 logConsole: true,
