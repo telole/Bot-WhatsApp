@@ -1,168 +1,248 @@
 const { create, decryptMedia } = require("@open-wa/wa-automate");
 const fs = require("fs");
-const sharp = require("sharp");
-const axios = require("axios");
 const path = require("path");
-const { exec } = require("child_process");
+const DownloaderService = require("./services/DownloaderService");
+const StickerService = require("./services/StickerService");
+const UtilityService = require("./services/UtilityService");
+const GroupService = require("./services/GroupService");
 
-create().then((client) => start(client));
+class WhatsAppBot {
+    constructor() {
+        this.client = null;
+        this.botNumber = null;
+        this.downloaderService = new DownloaderService();
+        this.stickerService = new StickerService();
+        this.utilityService = new UtilityService();
+        this.groupService = new GroupService();
+        
+        // Commands yang bisa digunakan tanpa mention di grup
+        this.groupCommands = [
+            "!tiktok", "!yt", "!youtube", "!ig", "!instagram",
+            "!stiker", "!quote", "!joke", "!cuaca", "!weather",
+            "!help", "!cmd", "!menu", "!cek"
+        ];
+    }
 
-async function start(client) {
-    console.log("✅ Bot WhatsApp Aktif!");
+    async initialize() {
+        try {
+            console.log("🔄 Memulai inisialisasi bot dengan konfigurasi minimal...");
 
-    client.onMessage(async (message) => {
-        const { body, type, mimetype, caption, from, isGroupMsg, mentionedJidList } = message;
-        const botNumber = await client.getHostNumber(); 
-        const isBotMentioned = mentionedJidList?.includes(`${botNumber}@c.us`) || false;
+            // Konfigurasi MINIMAL sesuai rekomendasi @open-wa
+            this.client = await create({
+                sessionId: "whatsapp-bot",
+                useChrome: true,
+                headless: false,          // Biar kelihatan kalau ada error di browser
+                qrTimeout: 0,             // Tidak timeout saat scan QR
+                authTimeout: 0,           // Jangan batasi proses login
+                blockCrashLogs: true,
+                disableSpins: true,
+                logConsole: true,
+                popup: true,
+                multiDevice: true,
+                chromiumArgs: [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage"
+                ]
+            });
 
-        if (isGroupMsg && !isBotMentioned) {
+            this.botNumber = await this.client.getHostNumber();
+            await this.setupEventHandlers();
+            console.log("✅ Bot WhatsApp Aktif!");
+            console.log(`📱 Bot Number: ${this.botNumber}`);
+        } catch (error) {
+            console.error("❌ Error initializing bot:", error);
+            console.error("💡 Cek juga: koneksi internet, apakah web.whatsapp.com bisa dibuka di browser biasa, dan apakah Chrome sudah terinstall.");
+            process.exit(1);
+        }
+    }
+
+    async setupEventHandlers() {
+        this.client.onMessage(async (message) => {
+            await this.handleMessage(message);
+        });
+
+        this.client.onStateChanged((state) => {
+            console.log("📱 State changed:", state);
+        });
+    }
+
+    async handleMessage(message) {
+        const { body, type, mimetype, caption, from, isGroupMsg, mentionedJidList, chat } = message;
+        
+        // Cek apakah bot di-mention atau command yang diizinkan di grup
+        const isBotMentioned = mentionedJidList?.includes(`${this.botNumber}@c.us`) || false;
+        const command = this.extractCommand(body);
+        const canUseInGroup = this.groupCommands.some(cmd => command.startsWith(cmd));
+
+        // Jika di grup dan tidak di-mention dan bukan command yang diizinkan, skip
+        if (isGroupMsg && !isBotMentioned && !canUseInGroup) {
             return;
         }
 
-        if (body === "!cek") {
-            client.sendText(from, "👋 Hello! BOT AKTIF 🚀");
-        } 
-        
-        else if (body === "!rules") {
-            client.sendText(from, `⚠️ Rules Bot:
+        try {
+            // Handle text commands
+            if (type === "chat" || type === "vcard") {
+                await this.handleTextCommand(body, from, isGroupMsg);
+            }
+            
+            // Handle media commands
+            if (type === "image" && caption) {
+                await this.handleMediaCommand(type, mimetype, caption, message, from);
+            }
+            
+            if (type === "video" && caption) {
+                await this.handleMediaCommand(type, mimetype, caption, message, from);
+            }
+        } catch (error) {
+            console.error("❌ Error handling message:", error);
+            await this.client.sendText(from, "⚠️ Terjadi kesalahan saat memproses perintah.");
+        }
+    }
+
+    extractCommand(text) {
+        if (!text) return "";
+        const trimmed = text.trim();
+        const spaceIndex = trimmed.indexOf(" ");
+        return spaceIndex > 0 ? trimmed.substring(0, spaceIndex) : trimmed;
+    }
+
+    async handleTextCommand(body, from, isGroupMsg) {
+        const command = body.toLowerCase().trim();
+        const args = body.split(" ").slice(1).join(" ");
+
+        switch (true) {
+            case command === "!cek" || command === "!ping":
+                await this.client.sendText(from, "👋 Hello! BOT AKTIF 🚀");
+                break;
+
+            case command === "!rules":
+                await this.sendRules(from);
+                break;
+
+            case command === "!jadwal":
+                await this.sendSchedule(from);
+                break;
+
+            case ["halo", "p", "hai", "hi", "hello"].includes(command):
+                await this.client.sendText(from, "Halo! Apa yang bisa saya bantu? 😊\nKetik *!menu* untuk melihat daftar perintah");
+                break;
+
+            case command === "!help" || command === "!cmd" || command === "!menu":
+                await this.sendHelpMenu(from);
+                break;
+
+            case command.startsWith("!tiktok "):
+                await this.downloaderService.downloadTikTok(this.client, from, args);
+                break;
+
+            case command.startsWith("!yt ") || command.startsWith("!youtube "):
+                await this.downloaderService.downloadYouTube(this.client, from, args);
+                break;
+
+            case command.startsWith("!ig ") || command.startsWith("!instagram "):
+                await this.downloaderService.downloadInstagram(this.client, from, args);
+                break;
+
+            case command === "!quote":
+                await this.utilityService.sendQuote(this.client, from);
+                break;
+
+            case command === "!joke":
+                await this.utilityService.sendJoke(this.client, from);
+                break;
+
+            case command.startsWith("!cuaca ") || command.startsWith("!weather "):
+                await this.utilityService.sendWeather(this.client, from, args);
+                break;
+
+            case command.startsWith("!search "):
+                await this.utilityService.searchImage(this.client, from, args);
+                break;
+
+            case command.startsWith("!translate "):
+                await this.utilityService.translateText(this.client, from, args);
+                break;
+
+            case isGroupMsg && command.startsWith("!groupinfo"):
+                await this.groupService.sendGroupInfo(this.client, from, message.chat);
+                break;
+
+            default:
+                // Tidak perlu respon untuk command yang tidak dikenal
+                break;
+        }
+    }
+
+    async handleMediaCommand(type, mimetype, caption, message, from) {
+        const captionLower = caption.toLowerCase().trim();
+
+        if (captionLower === "!stiker" || captionLower === "!sticker") {
+            if (type === "image" && mimetype.includes("image")) {
+                await this.stickerService.createStickerFromImage(this.client, message, from);
+            } else if (type === "video" && (mimetype.includes("gif") || mimetype.includes("video"))) {
+                await this.stickerService.createStickerFromVideo(this.client, message, from);
+            }
+        }
+    }
+
+    async sendRules(from) {
+        const rules = `⚠️ *Rules Bot:*
 - Jangan spam bot ❌
 - Jangan telpon bot 📵 (auto block)
 - Gunakan perintah dengan format yang benar ✅
-            
-Melanggar = bot keluar 🚪`);
-        } 
-        
-        else if (body === "!jadwal") {
-            client.sendText(from, `
-✨--JADWAL Pelajaran--✨
-📌 Senin: PIC / PCC
-📌 Selasa: PCC / PIC
-📌 Rabu: Jarkom, PAI, B.Inggris, PP
-📌 Kamis: Matematika, Sejarah, PKK, PJOK
-📌 Jumat: B.Indo, BK, B.Inggris
-----------------------------------------------`);
-        } 
-        
-        else if (["halo", "p", "hai", "hi"].includes(body.toLowerCase())) {
-            client.sendText(from, "Halo! Apa yang bisa saya bantu? 😊, *!cmd* untuk melihat menu");
-        }
+- Di grup, mention bot atau gunakan perintah yang diizinkan
+- Jangan kirim konten tidak pantas 🚫
 
-        else if (type === "image" && mimetype.includes("image") && caption === "!stiker") {
-            try {
-                await client.sendText(from, "⏳ Sedang mengonversi gambar ke stiker...");
+Melanggar = bot keluar 🚪`;
+        await this.client.sendText(from, rules);
+    }
 
-                const mediaData = await decryptMedia(message);
-                const outputPath = "./sticker.webp";
+    async sendSchedule(from) {
+        const schedule = `✨ *JADWAL Pelajaran* ✨
+📌 *Senin:* PIC / PCC
+📌 *Selasa:* PCC / PIC
+📌 *Rabu:* Jarkom, PAI, B.Inggris, PP
+📌 *Kamis:* Matematika, Sejarah, PKK, PJOK
+📌 *Jumat:* B.Indo, BK, B.Inggris
+----------------------------------------------`;
+        await this.client.sendText(from, schedule);
+    }
 
-                await sharp(mediaData)
-                    .resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }) 
-                    .webp()
-                    .toFile(outputPath);
+    async sendHelpMenu(from) {
+        const menu = `📌 *DAFTAR PERINTAH BOT*
 
-                await client.sendImageAsSticker(from, outputPath);
-                fs.unlinkSync(outputPath);
+🎬 *Downloader:*
+• *!tiktok <link>* - Download video TikTok tanpa watermark
+• *!yt <link>* atau *!youtube <link>* - Download video YouTube
+• *!ig <link>* atau *!instagram <link>* - Download foto/video Instagram
 
-                console.log("✅ Stiker berhasil dikirim!");
-            } catch (error) {
-                console.error("❌ Gagal mengonversi gambar ke stiker:", error);
-                await client.sendText(from, "⚠️ Gagal mengubah gambar menjadi stiker.");
-            }
-        }  
-        
-        else if (type === "video" && mimetype.includes("gif") && caption === "!stiker") {
-            try {
-                await client.sendText(from, "⏳ Sedang mengonversi video ke stiker...");
+🎨 *Sticker:*
+• *!stiker* - Kirim gambar/video dengan caption !stiker
 
-                const mediaData = await decryptMedia(message);
-                const gifPath = "./sticker.gif";
-                const webpPath = "./sticker.webp";
+📝 *Utility:*
+• *!quote* - Dapatkan quote inspiratif
+• *!joke* - Dapatkan joke lucu
+• *!cuaca <kota>* - Cek cuaca suatu kota
+• *!search <keyword>* - Cari gambar
+• *!translate <teks>* - Terjemahkan teks
 
-                fs.writeFileSync(gifPath, mediaData);
+📋 *Info:*
+• *!jadwal* - Lihat jadwal pelajaran
+• *!rules* - Lihat aturan bot
+• *!cek* - Cek status bot
+• *!menu* - Tampilkan menu ini
 
-                const encoder = new GIFEncoder(512, 512);
-                const canvas = createCanvas(512, 512);
-                const ctx = canvas.getContext("2d");
+💬 *Grup:*
+• Di grup, mention bot atau gunakan perintah yang diizinkan
+• *!groupinfo* - Info grup (hanya di grup)
 
-                encoder.start();
-                encoder.setRepeat(0);
-                encoder.setDelay(100);
-                encoder.setQuality(10);
-
-                const frames = [gifPath]; 
-                for (const frame of frames) {
-                    const image = await loadImage(frame);
-                    ctx.clearRect(0, 0, 512, 512);
-                    ctx.drawImage(image, 0, 0, 512, 512);
-                    encoder.addFrame(ctx);
-                }
-
-                encoder.finish();
-                fs.writeFileSync(gifPath, encoder.out.getData());
-
-                await sharp(gifPath)
-                    .webp()
-                    .toFile(webpPath);
-
-                await client.sendImageAsSticker(from, webpPath);
-                fs.unlinkSync(gifPath);
-                fs.unlinkSync(webpPath);
-
-                console.log("✅ Stiker video berhasil dikirim!");
-            } catch (error) {
-                console.error("❌ Gagal mengonversi video ke stiker:", error);
-                await client.sendText(from, "⚠️ Terjadi kesalahan saat mengubah video menjadi stiker.");
-            }
-        }
-        
-        
-        else if (body === "!help" || body === "!cmd") {
-            client.sendText(from, `📌 *Daftar Perintah:*
-- *!stiker* : Kirim gambar/GIF dengan caption *!stiker* untuk membuat stiker
-- *!jadwal* : Melihat jadwal XI TJKT 1
-- *!rules*  : Untuk melihat peraturan
-- *p, hi, halo* : Respon bot
-- *!cek* : Cek bot apakah aktif atau tidak
-- *!tiktok <link>* : Download video TikTok tanpa watermark`);
-        } 
-        
-        else if (body.startsWith("!tiktok ")) {
-            const url = body.split(" ")[1];
-            if (!url || !url.includes("tiktok.com")) {
-                client.sendText(from, "⚠️ Mohon kirimkan tautan TikTok yang valid!");
-                return;
-            }
-
-
-            try {
-                await client.sendText(from, "⏳ Mengunduh video dari TikTok...");
-        
-                const apiUrl = `https://ssstik.io/abc123/download?url=${encodeURIComponent(url)}`;
-                const response = await axios.get(apiUrl);
-        
-                if (response.data && response.data.data && response.data.data.url) {
-                    const videoUrl = response.data.data.url;
-                    const videoPath = path.join(__dirname, "tiktok.mp4");
-        
-                    const videoResponse = await axios({
-                        url: videoUrl,
-                        method: "GET",
-                        responseType: "stream",
-                    });
-        
-                    const writer = fs.createWriteStream(videoPath);
-                    videoResponse.data.pipe(writer);
-        
-                    writer.on("finish", async () => {
-                        await client.sendFile(from, videoPath, "tiktok.mp4", "🎥 Video TikTok berhasil diunduh!");
-                        fs.unlinkSync(videoPath);
-                    });
-                } else {
-                    client.sendText(from, "❌ Gagal mengambil video TikTok. Coba lagi!");
-                }
-            } catch (error) {
-                console.error("❌ Gagal mengunduh video TikTok:", error);
-                client.sendText(from, "⚠️ Terjadi kesalahan saat mengunduh video TikTok.");
-            }
-        }
-    });
+━━━━━━━━━━━━━━━━━━━━
+Bot WhatsApp Multi-Feature 🤖`;
+        await this.client.sendText(from, menu);
+    }
 }
+
+// Start bot
+const bot = new WhatsAppBot();
+bot.initialize();

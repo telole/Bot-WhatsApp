@@ -1,0 +1,28 @@
+{
+  "name": "whatsapp-bot-enhanced",
+  "version": "2.0.0",
+  "description": "WhatsApp Bot dengan banyak fitur termasuk TikTok, YouTube, Instagram downloader dan lainnya",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "tiktok",
+    "youtube",
+    "downloader"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@open-wa/wa-automate": "^4.45.0",
+    "axios": "^1.6.0",
+    "sharp": "^0.32.6",
+    "ytdl-core": "^4.11.5",
+    "fluent-ffmpeg": "^2.1.2",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
+

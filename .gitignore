@@ -1,0 +1,18 @@
+node_modules/
+temp/
+*.mp4
+*.jpg
+*.webp
+*.gif
+*.png
+.wwebjs_auth/
+.wwebjs_cache/
+session.data.json
+_IGNORE_session/
+*.log
+
+# managed
+**.data.json
+**.node-persist**
+**_IGNORE_**
+# end managed
